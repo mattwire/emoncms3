@@ -50,9 +50,10 @@ function reset_input_process($userid, $id)
   set_input_processlist($id, "");
 }
 
-function get_user_inputs($userid)
+function get_user_inputs($userid, $sortorder="name")
 {
-  $result = db_query("SELECT * FROM input WHERE userid = '$userid'");
+  if (empty($sortorder)) $sortorder="name";
+  $result = db_query("SELECT * FROM input WHERE userid = '$userid' ORDER BY $sortorder ASC");
   $inputs = array();
   if ($result)
   {

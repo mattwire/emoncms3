@@ -28,7 +28,7 @@
   function update_list()
   {
     $.ajax({                                      
-      url: path+"input/list.json",                
+      url: path+"input/list/value.json",                
       dataType: 'json',
       async: false,
       success: function(data) 
@@ -36,7 +36,9 @@
         inputs = data; 
 
         var i = 0;
-        var out = "<table class='catlist'><tr><th><?php echo _('Name'); ?></th><th><?php echo _('Updated'); ?></th><th><?php echo _('Value'); ?></th></tr>";
+        var out = "<table class='catlist'><tr>"
+        out += "<th><form action='../input/list/name.html' method='get' style='margin:0px;'><input type='submit' value='<?php echo _('Name'); ?>'/ ></form></th>"
+        out += "<th><?php echo _('Updated'); ?></th><th><?php echo _('Value'); ?></th></tr>";
 
         if (inputs.length==0) {
           out += "</table><table class='catlist'><tr class='d0' ><td>You have no inputs</td></tr></table>";

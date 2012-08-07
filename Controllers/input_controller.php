@@ -21,7 +21,7 @@
 function input_controller()
 {
   require "Models/input_model.php";
-  global $session, $action, $format;
+  global $session, $action, $subaction, $format;
 
   $output['content'] = "";
   $output['message'] = "";
@@ -32,8 +32,8 @@ function input_controller()
   //---------------------------------------------------------------------------------------------------------
   if ($action == 'list' && $session['read'])
   {
-    $inputs = get_user_inputs($session['userid']);
-
+    $inputs = get_user_inputs($session['userid'], $subaction);
+//    $inputs = get_user_inputs($session['userid']);
     if ($format == 'json') $output['content'] = json_encode($inputs);
     if ($format == 'html') $output['content'] = view("input/list_view.php", array('inputs' => $inputs));
   }
