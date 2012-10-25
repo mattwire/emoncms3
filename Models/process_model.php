@@ -147,20 +147,16 @@ function get_process_list()
     2,
     "heat_flux",
     1,
-    1
+    DataType::REALTIME
   );
-
 
   $list[19] = array(
     _("power gained to kWh/d"),
     2,
     "power_acc_to_kwhd",
     1,
-    1
+    DataType::REALTIME
   );
-
-
-
 
   return $list;
 }
