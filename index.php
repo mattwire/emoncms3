@@ -56,11 +56,11 @@ switch(db_connect()) {
 //---------------------------------------------------------------------------------
 // Init vars
 $format = "";
-$controller = "user";
+$controller = "";
 $action = "";
 $subaction = "";
 if (isset($_GET['q'])) {
-  $q = preg_replace('/[^.\/a-z0-9]/', '', $_GET['q']);
+  $q = preg_replace('/[^.\/A-Za-z0-9]/', '', $_GET['q']);
   // filter out all except a-z / .
   $q = db_real_escape_string($q);
   // second layer
@@ -106,15 +106,14 @@ set_emoncms_lang($session['userid']);
 $GLOBALS['theme'] = 'basic';
 
 // Redirect to login screen if user is no longer logged in (eg. after session timeout)
-if ($session['userid'] == 0) {
+if ($controller=='' && $action=='') {
   $controller="user";
   $action="login";
-}
+
 // Don't show login page if user IS logged in.  Redirect them to dashboard list instead.
-elseif (($session['userid'] > 0) && $action=="login") {
-  header("Location: ".$path."dashboard/list");
+  if ($session['userid'] > 0) header("Location: ".$path."dashboard/list");
 }
-  
+
 //---------------------------------------------------------------------------------
 // CREATE OUTPUT CONTENT ARRAY
 // All content is stored in the $output array

@@ -101,8 +101,8 @@ function get_process_list()
   );
   $list[12] = array(
     _("/ input"),
-    ProcessArg::VALUE,
-    "divide",
+    ProcessArg::INPUTID,
+    "divide_input",
     0,
     DataType::UNDEFINED
   );
@@ -142,6 +142,26 @@ function get_process_list()
     DataType::DAILY
   );
 
+  $list[18] = array(
+    _("heat flux"),
+    2,
+    "heat_flux",
+    1,
+    1
+  );
+
+
+  $list[19] = array(
+    _("power gained to kWh/d"),
+    2,
+    "power_acc_to_kwhd",
+    1,
+    1
+  );
+
+
+
+
   return $list;
 }
 
@@ -153,20 +173,20 @@ function auto_configure_inputs($userid, $id, $name)
   // If a power or solar (power) feed
   if (preg_match("/power/i", $name) || preg_match("/solar/i", $name))
   {
-    $feedid = create_feed($userid, $name, 1, 1);
+    $feedid = create_feed($userid, $name, 1, DataType::REALTIME);
     add_input_process($userid, $id, 1, $feedid);
 
-    $feedid = create_feed($userid, $name . "-kwhd", 1, 2);
+    $feedid = create_feed($userid, $name . "-kwhd", 1, DataType::DAILY);
     add_input_process($userid, $id, 5, $feedid);
 
-    $feedid = create_feed($userid, $name . "-histogram", 2, 3);
+    $feedid = create_feed($userid, $name . "-histogram", 2, DataType::HISTOGRAM);
     add_input_process($userid, $id, 16, $feedid);
   }
 
   if (preg_match("/temperature/i", $name) || preg_match("/temp/i", $name))
   {
     // 1) log to feed
-    $feedid = create_feed($userid, $name, 1, 1);
+    $feedid = create_feed($userid, $name, 1, DataType::REALTIME);
     add_input_process($userid, $id, 1, $feedid);
   }
 }
@@ -208,6 +228,18 @@ function times_input($id, $time, $value)
   $row = db_fetch_array($result);
   $value = $value * $row['value'];
   return $value;
+}
+
+function divide_input($id, $time, $value)
+{
+  $result = db_query("SELECT value FROM input WHERE id = '$id'");
+  $row = db_fetch_array($result);
+ 
+  if($row['value'] > 0){
+      return $value / $row['value'];
+  }else{
+      return null; // should this be null for a divide by zero?
+  }
 }
 
 function add_input($id, $time, $value)
@@ -268,7 +300,7 @@ function power_to_kwhd($feedid, $time_now, $value)
     $new_kwh = $last_kwh + $kwh_inc;
   }
 
-  $feedtime = mktime(0, 0, 0, date("m"), date("d"), date("Y"));
+  $feedtime = mktime(0, 0, 0, date("m",$time_now), date("d",$time_now), date("Y",$time_now));
   update_feed_data($feedid, $time_now, $feedtime, $new_kwh);
 
   return $value;
@@ -285,7 +317,7 @@ function kwhinc_to_kwhd($feedid, $time_now, $value)
   $kwh_inc = $value / 1000.0;
   $new_kwh = $last_kwh + $kwh_inc;
 
-  $feedtime = mktime(0, 0, 0, date("m"), date("d"), date("Y"));
+  $feedtime = mktime(0, 0, 0, date("m",$time_now), date("d",$time_now), date("Y",$time_now));
   update_feed_data($feedid, $time_now, $feedtime, $new_kwh);
 
   return $value;
@@ -309,7 +341,7 @@ function input_ontime($feedid, $time_now, $value)
     $ontime = $last_ontime + $time_elapsed;
   }
 
-  $feedtime = mktime(0, 0, 0, date("m"), date("d"), date("Y"));
+  $feedtime = mktime(0, 0, 0, date("m",$time_now), date("d",$time_now), date("Y",$time_now));
   update_feed_data($feedid, $time_now, $feedtime, $ontime);
 
   return $value;
@@ -320,7 +352,7 @@ function input_ontime($feedid, $time_now, $value)
 //---------------------------------------------------------------------------------
 function kwh_to_kwhd($feedid, $time_now, $value)
 {
-  $time = mktime(0, 0, 0, date("m"), date("d"), date("Y"));
+  $time = mktime(0, 0, 0, date("m",$time_now), date("d",$time_now), date("Y",$time_now));
 
   // First we check if there is an entry for the feed in the kwhdproc table
   $result = db_query("SELECT * FROM kwhdproc WHERE feedid = '$feedid'");
@@ -449,7 +481,7 @@ function histogram($feedid, $time_now, $value)
   }
   $new_value = round($value / $pot, 0, PHP_ROUND_HALF_UP) * $pot;
 
-  $time = mktime(0, 0, 0, date("m"), date("d"), date("Y"));
+  $time = mktime(0, 0, 0, date("m",$time_now), date("d",$time_now), date("Y",$time_now));
 
   // Get the last time
   $result = db_query("SELECT * FROM feeds WHERE id = '$feedid'");
@@ -496,7 +528,7 @@ function histogram($feedid, $time_now, $value)
 function average($feedid, $time_now, $value)
 {
   $feedname = "feed_" . trim($feedid) . "";
-  $feedtime = mktime(0, 0, 0, date("m"), date("d"), date("Y"));
+  $feedtime = mktime(0, 0, 0, date("m",$time_now), date("d",$time_now), date("Y",$time_now));
 
   $result = db_query("SELECT * FROM $feedname WHERE time = '$feedtime'");
   $row = db_fetch_array($result);
@@ -584,4 +616,91 @@ function average($feedid, $time_now, $value)
  return $rows;
  }
  */
+ 
+ 
+   //------------------------------------------------------------------------------------------------------
+  // Calculate the energy used to heat up water based on the rate of change for the current and a previous temperature reading
+  // See http://harizanov.com/2012/05/measuring-the-solar-yield/ for more info on how to use it
+  //------------------------------------------------------------------------------------------------------
+  function heat_flux($feedid,$time_now,$value)
+  {
+ // Get the feed
+	$feedname = "feed_".trim($feedid)."";
+     
+	// Get the current input id 
+	$result = db_query("Select * from input where processList like '%:$feedid%';");
+	$rowfound = db_fetch_array($result);
+	if ($rowfound)
+	{
+		$inputid = trim($rowfound['id']);
+		$processlist = $rowfound['processList'];
+		// Now get the feed for the log to feed command for the input 
+		$logfeed = preg_match('/1:(\d+)/',$processlist,$matches);
+		$logfeedid = trim($matches[1]);
+		// Now need to get the last but one value in the main log to feed table
+		$oldfeedname = "feed_".trim($logfeedid)."";
+
+		// Read previous N readings, starting not from the latest one, but the one before it (LIMIT 1,N)
+		// Find a previous reading that is at least 10 minutes apart from the current reading and average the in-between readings to smooth out fluctuations
+		// Without this we will get unstable readings
+
+		
+		$lastentry = db_query("Select * from $oldfeedname order by time desc LIMIT 1,128;");  
+		$lastentryrow = db_fetch_array($lastentry); 
+
+		$time_prev  = trim($lastentryrow['time']);	//Read the time of previous reading
+		$prevValue  = trim($lastentryrow['data']);	//Get previous reading
+
+		while($lastentryrow = db_fetch_array($lastentry)) {
+
+		$time_prev  = trim($lastentryrow['time']);
+		$prevValue  = trim($lastentryrow['data']);	 
+		if(($time_now-$time_prev)> 60*10) {
+			break;
+		}
+		}
+
+		$ratechange = $value - $prevValue;
+		$TimeDelta  = $time_now - $time_prev;		//Calculate time in seconds that has elapsed since then
+		
+		$ratechange = ($ratechange*4186/$TimeDelta);     //Calculate the temperature change per second
+									//Specific heat of Water (4186 J/kg/K)
+									//Multiply by the volume in liters in emoncms as a next step of the processing
+    }
+	return($ratechange);
+  }
+
+
+//For solar hot water heater, I need the positive amounts only to be able to calculate the energy harvested in a day. 
+//Negative values are when the hot water tank loses energy i.e. due to heat loss OR when being used for a shower, but I want the daily gain in energy only
+
+  function power_acc_to_kwhd($feedid,$time_now,$value)
+  {
+
+    if($value>0) {
+ 
+    $new_kwh = 0;
+
+    // Get last value
+    $last = get_feed_timevalue($feedid);
+    $last_kwh = $last['value'];
+    $last_time = strtotime($last['time']);
+
+    if ($last_time) {
+      // kWh calculation
+      $time_elapsed = ($time_now - $last_time);
+      $kwh_inc = ($time_elapsed * $value) / 3600000;
+      $new_kwh = $last_kwh + $kwh_inc;
+    }
+
+    $feedtime = mktime(0, 0, 0, date("m",$time_now), date("d",$time_now), date("Y",$time_now));
+    update_feed_data($feedid,$time_now,$feedtime,$new_kwh);
+
+    return $value;
+
+
+  }
+  }
+
+
 ?>

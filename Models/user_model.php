@@ -57,7 +57,8 @@ function get_user($userid)
       'email' => $row['email'],
       'apikey_read' => $row['apikey_read'],
       'apikey_write' => $row['apikey_write'],
-      'lang' => $row['lang']
+      'lang' => $row['lang'],
+      'timeoffset' => $row['timeoffset']
     );
   }
   return $user;
@@ -137,6 +138,12 @@ function create_user($username, $password)
   {
     db_query("UPDATE users SET admin = 1 WHERE id = '$userid'");
   }
+  
+  $user = array();
+  $user['id'] = $userid;
+  $user['writeapikey'] = $apikey_write;
+  $user['readapikey'] = $apikey_read;
+  return $user;
 }
 
 function ckeck_for_user_directory($username)
@@ -145,8 +152,8 @@ function ckeck_for_user_directory($username)
 	$id = get_user_id($username);
 	
 	// Check if the user directory exists and create it
-	if (!is_dir("./users/$id"))
-		mkdir("./users/$id", 0700);	
+	//if (!is_dir("./users/$id"))
+	//	mkdir("./users/$id", 0700);	
 }
 
 function user_logon($username, $password)
@@ -253,6 +260,31 @@ function get_user_lang($userid)
 	$result = db_query("SELECT lang FROM users WHERE id = '$userid';");
 	$row = db_fetch_array($result);
 	return $row['lang'];
+}
+
+function set_user_timeoffset($userid,$timeoffset)
+{
+  db_query("UPDATE users SET timeoffset = '$timeoffset' WHERE id='$userid'");
+}
+
+function get_user_timeoffset($userid)
+{
+  $result = db_query("SELECT timeoffset FROM users WHERE id = '$userid';");
+  $row = db_fetch_array($result);
+  return $row['timeoffset'];
+}
+
+function get_user_settingsarray($userid)
+{
+  $result = db_query("SELECT settingsarray FROM users WHERE id = '$userid';");
+  $row = db_fetch_array($result);
+  return json_decode($row['settingsarray']);
+}
+
+function set_user_settingsarray($userid, $settingsarray)
+{
+  $settingsarray = json_encode($settingsarray);
+  db_query("UPDATE users SET settingsarray = '$settingsarray' WHERE id='$userid'");
 }
 
 ?>

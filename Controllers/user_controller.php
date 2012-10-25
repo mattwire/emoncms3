@@ -30,56 +30,59 @@
 
   function user_controller()
   {
-    global $session, $action,$format;
+    global $session, $action,$format,$allowusersregister;
 
     $output['content'] = "";
     $output['message'] = "";
 
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // Login user (PUBLIC ACTION)
     // http://yoursite/emoncms/user/login?name=john&pass=test
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     if ($action == 'login')
     {
       if ((isset($_POST['name']) && isset($_POST['pass'])) &&
-        ($_POST["name"] && $_POST["pass"]))
+        ($_POST['name'] && $_POST['pass']))
       {
-        $username = preg_replace('/[^\w\s-.]/','',$_POST["name"]);	// filter out all except for alphanumeric white space and dash
+        $username = preg_replace('/[^\w\s-.]/','',$_POST['name']);	// filter out all except for alphanumeric white space and dash
         $username = db_real_escape_string($username);
 
-        $password = db_real_escape_string($_POST["pass"]);
+        $password = db_real_escape_string($_POST['pass']);
         $result = user_logon($username,$password);
 	  
         if ($result == 0)
         {
-      	  $output['message'] = _("Invalid username or password");
+      	  $output['message'] = _('Invalid username or password');
           $output['content'] = view("user/login_block.php", array());
         }
         else
         {	      	
-      	  $output['message'] = _("Welcome, you are now logged in");
+      	  $output['message'] = _('Welcome, you are now logged in');
     	  if ($format == 'html'){
-      	    header("Location: ../dashboard/list");
+      	    header('Location: ../dashboard/list');
 	  }
         }
       } 
       else
       {
-        $output['content'] = view("user/login_block.php", array());
+        $output['content'] = view('user/login_block.php', array());
       }
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // Create a user (PUBLIC ACTION) 
     // To disable addtional user creation remove or add higher priviledges to this
     // http://yoursite/emoncms/user/create?name=john&pass=test
-    //---------------------------------------------------------------------------------------------------------
-    elseif ($action == 'create')
-    {
+    //--------------------------------------------------------------------------
+    elseif ($action == 'create' && $allowusersregister)
+    {    	
       $username = preg_replace('/[^\w\s-.]/','',$_POST["name"]);	// filter out all except for alphanumeric white space and dash
       $username = db_real_escape_string($username);
 
       $password = db_real_escape_string($_POST["pass"]);
+
+      // New option to return apikey on register - for use with drupal auth integration
+      if ($_GET['returnapikey']==true) $returnapikey = true; else $returnapikey = false;
 
       if (get_user_id($username) != 0)
       {
@@ -95,13 +98,20 @@
       }  
       else
       {
-        create_user($username,$password);
-        $result = user_logon($username,$password);
-        $output['message'] = _("Your new account has been created");
+        $user = create_user($username,$password);
+        if (!$returnapikey) 
+        {
+          $result = user_logon($username,$password);
+          $output['message'] = _("Your new account has been created");
+        }
+        else
+        {
+          $output['message'] = $user['readapikey'];
+        }
         if ($format == 'html')
         {
           header("Location: ../dashboard/list");
-	}
+				}
         if ($_SESSION['write']){
           create_user_statistics($_SESSION['userid']);
         }
@@ -157,10 +167,10 @@
 
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // NEW API READ
     // http://yoursite/emoncms/user/newapiread
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     elseif ($action == 'newapiread' && $session['write'])
     {
       $apikey_read = md5(uniqid(mt_rand(), true));
@@ -173,10 +183,10 @@
       }
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // NEW API WRITE
     // http://yoursite/emoncms/user/newapiwrite
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     elseif ($action == 'newapiwrite' && $session['write'])
     {
       $apikey_write = md5(uniqid(mt_rand(), true));
@@ -189,10 +199,10 @@
       }
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // Logout
     // http://yoursite/emoncms/user/logout
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     elseif ($action == 'logout' && $session['read'])
     { 
         if ($_POST['CSRF_token'] == $_SESSION['CSRF_token'])
@@ -211,30 +221,30 @@
       }
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // GET API READ
     // http://yoursite/emoncms/user/getapiread
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     elseif ($action == 'getapiread' && $session['read'])
     {
       $apikey_read = get_apikey_read($session['userid']);
       $output = $apikey_read;
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // GET API WRITE
     // http://yoursite/emoncms/user/getapiwrite
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     elseif ($action == 'getapiwrite' && $session['write'])
     {
       $apikey_write = get_apikey_write($session['userid']);
       $output = $apikey_write;
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // GET USER
     // http://yoursite/emoncms/user/view
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     elseif ($action == 'view' && $session['write'])
     {
       $user = get_user($session['userid']);
@@ -244,20 +254,20 @@
       if ($format == 'html') $output['content'] = view("user_view.php", array('user' => $user, 'stats'=>$stats));
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // SET USERS DEFAULT LANGUAGE
     // http://yoursite/emoncms/user/setlang
-    //---------------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     elseif ($action == 'setlang' && $session['write'])
     {
-		  // Store userlang in database
-		  set_user_lang($session['userid'],$_GET['lang']);
+      // Store userlang in database
+      set_user_lang($session['userid'],$_GET['lang']);
 
-		  // Reload the page	  	
-		  if ($format == 'html')
-		  {
-  			header("Location: view");
-	   	}
+      // Reload the page	  	
+      if ($format == 'html')
+      {
+        header("Location: view");
+      }
     }
 
     return $output;
